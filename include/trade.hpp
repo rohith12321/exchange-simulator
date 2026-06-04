@@ -5,7 +5,7 @@ class Trade{
         long long buyOrderId;
         long long sellOrderId;
         int quantity;
-        double price;
+        long long price;
         long long timestamp;
 
         Trade(
@@ -13,7 +13,7 @@ class Trade{
             long long buyOrderId, 
             long long sellOrderId, 
             int quantity, 
-            double price, 
+            long long price, 
             long long timestamp
         );
 };

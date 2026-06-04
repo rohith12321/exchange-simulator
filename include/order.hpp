@@ -17,7 +17,7 @@ class Order{
         Side side;
         OrderType type;
         int quantity;
-        double price;
+        long long price;
         long long timestamp;
 
         Order(
@@ -26,7 +26,7 @@ class Order{
             Side side, 
             OrderType type, 
             int quantity, 
-            double price, 
+            long long price, 
             long long timestamp
         );
 };
