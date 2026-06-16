@@ -9,8 +9,6 @@ class MatchingEngine{
     public:
         OrderBook orderBook;
         std::vector<Trade> trades;
-
         inline static int nextTradeId = 1;
-
-        void processOrder(Order order);
+        std::vector<Trade> processOrder(Order order);
 };
