@@ -5,8 +5,7 @@
 #include "trade.hpp"
 #include "orderbook.hpp"
 
-class MatchingEngine
-{
+class MatchingEngine{
     public:
         OrderBook orderBook;
         std::vector<Trade> trades;
