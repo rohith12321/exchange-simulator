@@ -54,4 +54,42 @@ void Exchange::settleTrade(const Trade& trade){
 
     seller.updateCash(totalCost);
     seller.updatePosition(-trade.quantity);
+
+    buyOrder.quantity -= trade.quantity;
+    sellOrder.quantity -= trade.quantity;
+
+    if(buyOrder.quantity == 0){
+        buyOrder.status = OrderStatus::FILLED;
+    }
+    else{
+        buyOrder.status = OrderStatus::PARTIALLY_FILLED;
+    }
+
+    if(sellOrder.quantity == 0){
+        sellOrder.status = OrderStatus::FILLED;
+    }
+    else{
+        sellOrder.status = OrderStatus::PARTIALLY_FILLED;
+    }
+}
+
+bool Exchange::cancelOrder(int orderId){
+    Order& order = orders.at(orderId);
+
+    if(order.status == OrderStatus::FILLED)
+        return false;
+
+    if(order.status == OrderStatus::CANCELLED)
+        return false;
+
+    auto& book = matchingEngine.orderBook;
+
+    if(order.side == Side::BUY)
+        book.buys.erase(order);
+    else
+        book.sells.erase(order);
+
+    order.status = OrderStatus::CANCELLED;
+
+    return true;
 }

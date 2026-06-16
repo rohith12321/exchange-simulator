@@ -2,20 +2,20 @@
 using namespace std;
 
 Order::Order(
-    long long orderId, 
-    int traderId, 
-    Side side, 
-    OrderType type, 
-    int quantity, 
-    long long price, 
+    long long orderId,
+    int traderId,
+    Side side,
+    OrderType type,
+    int quantity,
+    long long price,
     long long timestamp
 )
-{
-    this -> orderId = orderId;
-    this -> traderId = traderId;
-    this -> side = side;
-    this -> type = type;
-    this -> quantity = quantity;
-    this -> price = price;
-    this -> timestamp = timestamp;
+    : orderId(orderId),
+      traderId(traderId),
+      side(side),
+      type(type),
+      status(OrderStatus::NEW),
+      quantity(quantity),
+      price(price),
+      timestamp(timestamp){
 }

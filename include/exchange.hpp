@@ -16,4 +16,5 @@ class Exchange{
         Trader& getTrader(int traderId);
         Order& getOrder(int orderId);
         MatchingEngine& getMatchingEngine();
+        bool cancelOrder(int orderId);
 };

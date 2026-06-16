@@ -1,32 +1,40 @@
 #pragma once
 
 enum class Side{
-    BUY, 
+    BUY,
     SELL
 };
 
 enum class OrderType{
-    MARKET, 
+    MARKET,
     LIMIT
 };
 
-class Order{
-    public:
-        long long orderId;
-        int traderId;
-        Side side;
-        OrderType type;
-        int quantity;
-        long long price;
-        long long timestamp;
+enum class OrderStatus{
+    NEW,
+    PARTIALLY_FILLED,
+    FILLED,
+    CANCELLED
+};
 
-        Order(
-            long long orderId, 
-            int traderId, 
-            Side side, 
-            OrderType type, 
-            int quantity, 
-            long long price, 
-            long long timestamp
-        );
+class Order{
+public:
+    long long orderId;
+    int traderId;
+    Side side;
+    OrderType type;
+    OrderStatus status;
+    int quantity;
+    long long price;
+    long long timestamp;
+
+    Order(
+        long long orderId,
+        int traderId,
+        Side side,
+        OrderType type,
+        int quantity,
+        long long price,
+        long long timestamp
+    );
 };
