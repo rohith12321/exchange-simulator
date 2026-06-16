@@ -1,0 +1,15 @@
+# Build artifacts
+*.exe
+*.out
+*.o
+*.obj
+
+# Build directories
+build/
+out/
+cmake-build-debug/
+cmake-build-release/
+
+# VS Code
+.vscode/
+!.vscode/tasks.json
