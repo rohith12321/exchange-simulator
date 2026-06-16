@@ -10,6 +10,58 @@ void Exchange::addTrader(int traderId, long long initialCash){
     );
 }
 
+bool Exchange::validateOrder(const Order& order){
+    const Trader& trader = traders.at(order.traderId);
+
+    if(order.quantity <= 0){
+        return false;
+    }
+
+    if(order.type == OrderType::LIMIT &&
+       order.price <= 0){
+        return false;
+    }
+
+    if(order.side == Side::BUY){
+
+        if(order.type == OrderType::LIMIT){
+
+            long long requiredCash =
+                1LL * order.quantity * order.price;
+
+            if(trader.getCash() < requiredCash)
+                return false;
+        }
+        else{
+
+            long long totalCost = 0;
+            int remaining = order.quantity;
+
+            const auto& sells =
+                matchingEngine.orderBook.sells;
+
+            for(const auto& sell : sells){
+
+                if(remaining == 0)
+                    break;
+
+                int traded =
+                    min(remaining, sell.quantity);
+
+                totalCost +=
+                    1LL * traded * sell.price;
+
+                remaining -= traded;
+            }
+
+            if(trader.getCash() < totalCost)
+                return false;
+        }
+    }
+
+    return true;
+}
+
 void Exchange::submitOrder(Order order){
     if(traders.find(order.traderId) == traders.end()){
         throw runtime_error("Unknown Trader");
@@ -19,12 +71,31 @@ void Exchange::submitOrder(Order order){
         throw runtime_error("Duplicate Order ID");
     }
 
+    if(!validateOrder(order)){
+        throw runtime_error(
+            "Risk check failed"
+        );
+    }
+
     orders.emplace(order.orderId, order);
 
     auto newTrades = matchingEngine.processOrder(order);
 
     for(const auto& trade : newTrades){
         settleTrade(trade);
+    }
+
+    if(order.type == OrderType::MARKET){
+        Order& storedOrder = orders.at(order.orderId);
+
+        storedOrder.quantity = 0;
+
+        if(!newTrades.empty()){
+            storedOrder.status = OrderStatus::FILLED;
+        }
+        else{
+            storedOrder.status = OrderStatus::CANCELLED;
+        }
     }
 }
 

@@ -17,4 +17,5 @@ class Exchange{
         Order& getOrder(int orderId);
         MatchingEngine& getMatchingEngine();
         bool cancelOrder(int orderId);
+        bool validateOrder(const Order& order);
 };

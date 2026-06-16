@@ -2,15 +2,27 @@
 #include <iostream>
 
 #include "../include/matchingengine.hpp"
+
 using namespace std;
 
 vector<Trade> MatchingEngine::processOrder(Order order){
     vector<Trade> newTrades;
+
     if(order.side == Side::BUY){
         auto it = orderBook.sells.begin();
-        while(it != orderBook.sells.end() && it->price <= order.price && order.quantity > 0){
+
+        while(
+            it != orderBook.sells.end() &&
+            order.quantity > 0 &&
+            (
+                order.type == OrderType::MARKET ||
+                it->price <= order.price
+            )
+        ){
             int tradeQuantity = min(order.quantity, it->quantity);
+
             long long tradePrice = it->price;
+
             trades.emplace_back(
                 nextTradeId++,
                 order.orderId,
@@ -26,21 +38,34 @@ vector<Trade> MatchingEngine::processOrder(Order order){
 
             Order updatedSellOrder = *it;
             updatedSellOrder.quantity -= tradeQuantity;
+
             orderBook.sells.erase(it);
 
-            if(updatedSellOrder.quantity > 0)
+            if(updatedSellOrder.quantity > 0){
                 orderBook.addOrder(updatedSellOrder);
+            }
 
             it = orderBook.sells.begin();
         }
 
-        if(order.quantity > 0)
+        if(
+            order.quantity > 0 &&
+            order.type == OrderType::LIMIT
+        ){
             orderBook.addOrder(order);
+        }
     }
     else{
         auto it = orderBook.buys.begin();
 
-        while(it != orderBook.buys.end() && it->price >= order.price && order.quantity > 0){
+        while(
+            it != orderBook.buys.end() &&
+            order.quantity > 0 &&
+            (
+                order.type == OrderType::MARKET ||
+                it->price >= order.price
+            )
+        ){
             int tradeQuantity = min(order.quantity, it->quantity);
 
             long long tradePrice = it->price;
@@ -60,16 +85,22 @@ vector<Trade> MatchingEngine::processOrder(Order order){
 
             Order updatedBuyOrder = *it;
             updatedBuyOrder.quantity -= tradeQuantity;
+
             orderBook.buys.erase(it);
 
-            if(updatedBuyOrder.quantity > 0)
+            if(updatedBuyOrder.quantity > 0){
                 orderBook.addOrder(updatedBuyOrder);
+            }
 
             it = orderBook.buys.begin();
         }
 
-        if(order.quantity > 0)
+        if(
+            order.quantity > 0 &&
+            order.type == OrderType::LIMIT
+        ){
             orderBook.addOrder(order);
+        }
     }
 
     return newTrades;
