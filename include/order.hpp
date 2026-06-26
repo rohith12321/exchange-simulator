@@ -28,6 +28,8 @@ public:
     long long price;
     long long timestamp;
 
+    Order() = default;
+
     Order(
         long long orderId,
         int traderId,

@@ -3,6 +3,66 @@
 
 using namespace std;
 
+Exchange::Exchange(){
+    matchingThread = thread([this](){
+        Order order;
+
+        while(orderQueue.pop(order)){
+            if(order.type == OrderType::MARKET && !validateMarketOrder(order)){
+                {
+                    lock_guard<mutex> lock(ordersMutex);
+                    Order& storedOrder = orders.at(order.orderId);
+                    storedOrder.quantity = 0;
+                    storedOrder.status = OrderStatus::CANCELLED;
+                }
+
+                {
+                    lock_guard<mutex> lock(completionMutex);
+                    pendingOrders--;
+                }
+
+                completionCv.notify_all();
+                continue;
+            }
+
+            auto newTrades = matchingEngine.processOrder(order);
+
+            for(const auto& trade : newTrades){
+                settleTrade(trade);
+            }
+
+            if(order.type == OrderType::MARKET){
+                lock_guard<mutex> lock(ordersMutex);
+
+                Order& storedOrder = orders.at(order.orderId);
+                storedOrder.quantity = 0;
+
+                if(!newTrades.empty()){
+                    storedOrder.status = OrderStatus::FILLED;
+                }
+                else{
+                    storedOrder.status = OrderStatus::CANCELLED;
+                }
+            }
+
+            {
+                lock_guard<mutex> lock(completionMutex);
+                pendingOrders--;
+            }
+
+            completionCv.notify_all();
+        }
+    });
+}
+
+Exchange::~Exchange(){
+    orderQueue.stop();
+
+    if(matchingThread.joinable()){
+        matchingThread.join();
+    }
+}
+
 void Exchange::addTrader(int traderId, long long initialCash){
     traders.emplace(
         traderId,
@@ -22,41 +82,53 @@ bool Exchange::validateOrder(const Order& order){
         return false;
     }
 
-    if(order.side == Side::BUY){
+    if(order.side == Side::BUY &&
+       order.type == OrderType::LIMIT){
 
-        if(order.type == OrderType::LIMIT){
+        long long requiredCash =
+            1LL * order.quantity * order.price;
 
-            long long requiredCash =
-                1LL * order.quantity * order.price;
-
-            if(trader.getCash() < requiredCash)
-                return false;
+        if(trader.getCash() < requiredCash){
+            return false;
         }
-        else{
+    }
 
-            long long totalCost = 0;
-            int remaining = order.quantity;
+    return true;
+}
 
-            const auto& sells =
-                matchingEngine.orderBook.sells;
+bool Exchange::validateMarketOrder(const Order& order){
+    if(order.side != Side::BUY){
+        return true;
+    }
 
-            for(const auto& sell : sells){
+    const Trader& trader = traders.at(order.traderId);
 
-                if(remaining == 0)
-                    break;
+    long long totalCost = 0;
+    int remaining = order.quantity;
 
-                int traded =
-                    min(remaining, sell.quantity);
+    const auto& sells =
+        matchingEngine.orderBook.sells;
 
-                totalCost +=
-                    1LL * traded * sell.price;
-
-                remaining -= traded;
-            }
-
-            if(trader.getCash() < totalCost)
-                return false;
+    for(const auto& sell : sells){
+        if(remaining == 0){
+            break;
         }
+
+        int traded =
+            min(remaining, sell.quantity);
+
+        totalCost +=
+            1LL * traded * sell.price;
+
+        remaining -= traded;
+    }
+
+    if(remaining > 0){
+        return false;
+    }
+
+    if(trader.getCash() < totalCost){
+        return false;
     }
 
     return true;
@@ -67,36 +139,26 @@ void Exchange::submitOrder(Order order){
         throw runtime_error("Unknown Trader");
     }
 
-    if(orders.count(order.orderId)){
-        throw runtime_error("Duplicate Order ID");
-    }
-
     if(!validateOrder(order)){
-        throw runtime_error(
-            "Risk check failed"
-        );
+        throw runtime_error("Risk check failed");
     }
 
-    orders.emplace(order.orderId, order);
+    {
+        lock_guard<mutex> lock(ordersMutex);
 
-    auto newTrades = matchingEngine.processOrder(order);
-
-    for(const auto& trade : newTrades){
-        settleTrade(trade);
-    }
-
-    if(order.type == OrderType::MARKET){
-        Order& storedOrder = orders.at(order.orderId);
-
-        storedOrder.quantity = 0;
-
-        if(!newTrades.empty()){
-            storedOrder.status = OrderStatus::FILLED;
+        if(orders.count(order.orderId)){
+            throw runtime_error("Duplicate Order ID");
         }
-        else{
-            storedOrder.status = OrderStatus::CANCELLED;
-        }
+
+        orders.emplace(order.orderId, order);
     }
+
+    {
+        lock_guard<mutex> lock(completionMutex);
+        pendingOrders++;
+    }
+
+    orderQueue.push(order);
 }
 
 Trader& Exchange::getTrader(int traderId){
@@ -112,6 +174,8 @@ MatchingEngine& Exchange::getMatchingEngine(){
 }
 
 void Exchange::settleTrade(const Trade& trade){
+    lock_guard<mutex> lock(ordersMutex);
+
     Order& buyOrder = orders.at(trade.buyOrderId);
     Order& sellOrder = orders.at(trade.sellOrderId);
 
@@ -144,23 +208,14 @@ void Exchange::settleTrade(const Trade& trade){
     }
 }
 
-bool Exchange::cancelOrder(int orderId){
-    Order& order = orders.at(orderId);
+Order& Exchange::getOrder(int orderId){
+    return orders.at(orderId);
+}
 
-    if(order.status == OrderStatus::FILLED)
-        return false;
+void Exchange::waitUntilIdle(){
+    unique_lock<mutex> lock(completionMutex);
 
-    if(order.status == OrderStatus::CANCELLED)
-        return false;
-
-    auto& book = matchingEngine.orderBook;
-
-    if(order.side == Side::BUY)
-        book.buys.erase(order);
-    else
-        book.sells.erase(order);
-
-    order.status = OrderStatus::CANCELLED;
-
-    return true;
+    completionCv.wait(lock, [this](){
+        return pendingOrders == 0;
+    });
 }
