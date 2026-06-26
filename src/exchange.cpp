@@ -208,10 +208,6 @@ void Exchange::settleTrade(const Trade& trade){
     }
 }
 
-Order& Exchange::getOrder(int orderId){
-    return orders.at(orderId);
-}
-
 void Exchange::waitUntilIdle(){
     unique_lock<mutex> lock(completionMutex);
 
