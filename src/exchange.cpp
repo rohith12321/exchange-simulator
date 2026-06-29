@@ -1,5 +1,14 @@
 #include "../include/exchange.hpp"
 #include <stdexcept>
+#include <atomic>
+#include <chrono>
+
+using Clock = std::chrono::steady_clock;
+
+std::atomic<long long> validateTime{0};
+std::atomic<long long> ordersLockTime{0};
+std::atomic<long long> completionLockTime{0};
+std::atomic<long long> queuePushTime{0};
 
 using namespace std;
 
@@ -158,6 +167,9 @@ bool Exchange::validateMarketOrder(const Order& order){
 }
 
 void Exchange::submitOrder(Order order){
+
+    auto t0 = Clock::now();
+
     if(traders.find(order.traderId) == traders.end()){
         throw runtime_error("Unknown Trader");
     }
@@ -165,6 +177,8 @@ void Exchange::submitOrder(Order order){
     if(!validateOrder(order)){
         throw runtime_error("Risk check failed");
     }
+
+    auto t1 = Clock::now();
 
     {
         lock_guard<mutex> lock(ordersMutex);
@@ -176,13 +190,31 @@ void Exchange::submitOrder(Order order){
         orders.emplace(order.orderId, order);
     }
 
+    auto t2 = Clock::now();
+
     {
         lock_guard<mutex> lock(completionMutex);
         pendingOrders++;
     }
 
+    auto t3 = Clock::now();
+
     auto& engine = symbolEngines[toIndex(order.symbol)];
     engine.orderQueue.push(order);
+
+    auto t4 = Clock::now();
+
+    validateTime +=
+        chrono::duration_cast<chrono::nanoseconds>(t1 - t0).count();
+
+    ordersLockTime +=
+        chrono::duration_cast<chrono::nanoseconds>(t2 - t1).count();
+
+    completionLockTime +=
+        chrono::duration_cast<chrono::nanoseconds>(t3 - t2).count();
+
+    queuePushTime +=
+        chrono::duration_cast<chrono::nanoseconds>(t4 - t3).count();
 }
 
 Trader& Exchange::getTrader(int traderId){

@@ -15,7 +15,6 @@ class Exchange{
         std::array<SymbolEngine, 5> symbolEngines;
 
         std::unordered_map<int, Trader> traders;
-        std::unordered_map<int, Order> orders;
 
         std::mutex ordersMutex;
 
@@ -26,7 +25,7 @@ class Exchange{
     public:
         Exchange();
         ~Exchange();
-
+        std::unordered_map<int, Order> orders;
         void addTrader(int traderId, long long initialCash = 1000000);
         void submitOrder(Order order);
         void settleTrade(const Trade& trade);
