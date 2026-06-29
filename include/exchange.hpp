@@ -1,21 +1,42 @@
 #pragma once
+
+#include <array>
 #include <unordered_map>
-#include "matchingengine.hpp"
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+
+#include "symbolengine.hpp"
 #include "trader.hpp"
 #include "order.hpp"
 
 class Exchange{
     private:
-        MatchingEngine matchingEngine;
+        std::array<SymbolEngine, 5> symbolEngines;
+
         std::unordered_map<int, Trader> traders;
-        std::unordered_map<int, Order> orders;
+
+        std::mutex ordersMutex;
+
+        std::mutex completionMutex;
+        std::condition_variable completionCv;
+        int pendingOrders = 0;
+
     public:
-        void addTrader(int TraderId, long long initialCash = 1000000);
-        void submitOrder(Order order);
+        Exchange();
+        ~Exchange();
+        std::unordered_map<int, Order> orders;
+        void addTrader(int traderId, long long initialCash = 1000000);
+        bool submitOrder(Order order);
         void settleTrade(const Trade& trade);
+
         Trader& getTrader(int traderId);
         Order& getOrder(int orderId);
-        MatchingEngine& getMatchingEngine();
+        MatchingEngine& getMatchingEngine(Symbol symbol);
+
         bool cancelOrder(int orderId);
         bool validateOrder(const Order& order);
+        bool validateMarketOrder(const Order& order);
+
+        void waitUntilIdle();
 };

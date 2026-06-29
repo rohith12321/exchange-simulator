@@ -1,5 +1,7 @@
 #pragma once
 
+#include "symbol.hpp"
+
 enum class Side{
     BUY,
     SELL
@@ -21,6 +23,7 @@ class Order{
 public:
     long long orderId;
     int traderId;
+    Symbol symbol;
     Side side;
     OrderType type;
     OrderStatus status;
@@ -28,9 +31,12 @@ public:
     long long price;
     long long timestamp;
 
+    Order() = default;
+
     Order(
         long long orderId,
         int traderId,
+        Symbol symbol,
         Side side,
         OrderType type,
         int quantity,

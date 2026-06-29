@@ -10,31 +10,139 @@ int main(){
     exchange.addTrader(1, 1000000000);
     exchange.addTrader(2, 1000000000);
 
-    const int N = 10000;
+    int id = 1;
+    int ts = 1;
 
-    for(int i = 0; i < N; i++){
-        exchange.submitOrder(
-            Order(i + 1, 1, Side::BUY, OrderType::LIMIT, 1, 500, i + 1)
-        );
-    }
+    // ---------------- AAPL ----------------
 
-    for(int i = 0; i < N; i++){
-        exchange.submitOrder(
-            Order(N + i + 1, 2, Side::SELL, OrderType::LIMIT, 1, 500, N + i + 1)
-        );
-    }
+    exchange.submitOrder(
+        Order(id++, 1, Symbol::AAPL,
+              Side::BUY, OrderType::LIMIT,
+              10, 100, ts++)
+    );
 
-    auto& engine = exchange.getMatchingEngine();
+    exchange.submitOrder(
+        Order(id++, 2, Symbol::AAPL,
+              Side::SELL, OrderType::LIMIT,
+              4, 100, ts++)
+    );
 
-    cout << "Trades: " << engine.trades.size() << '\n';
-    cout << "Buy Orders Remaining: " << engine.orderBook.buys.size() << '\n';
-    cout << "Sell Orders Remaining: " << engine.orderBook.sells.size() << '\n';
+    exchange.submitOrder(
+        Order(id++, 2, Symbol::AAPL,
+              Side::SELL, OrderType::LIMIT,
+              3, 99, ts++)
+    );
 
-    cout << "Trader 1 Cash: " << exchange.getTrader(1).getCash() << '\n';
-    cout << "Trader 1 Position: " << exchange.getTrader(1).getPosition() << '\n';
+    // ---------------- GOOG ----------------
 
-    cout << "Trader 2 Cash: " << exchange.getTrader(2).getCash() << '\n';
-    cout << "Trader 2 Position: " << exchange.getTrader(2).getPosition() << '\n';
+    exchange.submitOrder(
+        Order(id++, 2, Symbol::GOOG,
+              Side::SELL, OrderType::LIMIT,
+              5, 200, ts++)
+    );
+
+    exchange.submitOrder(
+        Order(id++, 1, Symbol::GOOG,
+              Side::BUY, OrderType::LIMIT,
+              2, 200, ts++)
+    );
+
+    exchange.submitOrder(
+        Order(id++, 1, Symbol::GOOG,
+              Side::BUY, OrderType::LIMIT,
+              5, 200, ts++)
+    );
+
+    // ---------------- MSFT ----------------
+
+    exchange.submitOrder(
+        Order(id++, 1, Symbol::MSFT,
+              Side::BUY, OrderType::LIMIT,
+              8, 300, ts++)
+    );
+
+    exchange.submitOrder(
+        Order(id++, 2, Symbol::MSFT,
+              Side::SELL, OrderType::LIMIT,
+              10, 300, ts++)
+    );
+
+    // ---------------- NVDA ----------------
+
+    exchange.submitOrder(
+        Order(id++, 2, Symbol::NVDA,
+              Side::SELL, OrderType::LIMIT,
+              6, 400, ts++)
+    );
+
+    // unmatched buy
+
+    exchange.submitOrder(
+        Order(id++, 1, Symbol::NVDA,
+              Side::BUY, OrderType::LIMIT,
+              3, 390, ts++)
+    );
+
+    // ---------------- TSLA ----------------
+
+    exchange.submitOrder(
+        Order(id++, 1, Symbol::TSLA,
+              Side::BUY, OrderType::LIMIT,
+              5, 500, ts++)
+    );
+
+    exchange.submitOrder(
+        Order(id++, 2, Symbol::TSLA,
+              Side::SELL, OrderType::LIMIT,
+              5, 500, ts++)
+    );
+
+    exchange.waitUntilIdle();
+
+    auto printBook = [&](Symbol symbol, const string& name){
+
+        auto& engine = exchange.getMatchingEngine(symbol);
+
+        cout << "========== "
+             << name
+             << " ==========\n";
+
+        cout << "Trades : "
+             << engine.trades.size()
+             << '\n';
+
+        cout << "Buy Orders : "
+             << engine.orderBook.buys.size()
+             << '\n';
+
+        cout << "Sell Orders : "
+             << engine.orderBook.sells.size()
+             << "\n\n";
+    };
+
+    printBook(Symbol::AAPL, "AAPL");
+    printBook(Symbol::GOOG, "GOOG");
+    printBook(Symbol::MSFT, "MSFT");
+    printBook(Symbol::NVDA, "NVDA");
+    printBook(Symbol::TSLA, "TSLA");
+
+    cout << "========== Traders ==========\n";
+
+    cout << "Trader1 Cash : "
+         << exchange.getTrader(1).getCash()
+         << '\n';
+
+    cout << "Trader1 Position : "
+         << exchange.getTrader(1).getPosition()
+         << '\n';
+
+    cout << "Trader2 Cash : "
+         << exchange.getTrader(2).getCash()
+         << '\n';
+
+    cout << "Trader2 Position : "
+         << exchange.getTrader(2).getPosition()
+         << '\n';
 
     return 0;
 }
