@@ -4,16 +4,61 @@
 using namespace std;
 
 Exchange::Exchange(){
-    symbolEngine.matchingThread = thread([this](){
-        Order order;
+    for(int i = 0; i < 5; i++){
+        Symbol symbol = static_cast<Symbol>(i);
 
-        while(symbolEngine.orderQueue.pop(order)){
-            if(order.type == OrderType::MARKET && !validateMarketOrder(order)){
-                {
+        symbolEngines[i].matchingThread = thread([this, symbol](){
+
+            auto& engine = symbolEngines[toIndex(symbol)];
+
+            Order order;
+
+            while(engine.orderQueue.pop(order)){
+                if(order.type == OrderType::MARKET &&
+                   !validateMarketOrder(order)){
+                    {
+                        lock_guard<mutex> lock(ordersMutex);
+
+                        Order& storedOrder =
+                            orders.at(order.orderId);
+
+                        storedOrder.quantity = 0;
+                        storedOrder.status =
+                            OrderStatus::CANCELLED;
+                    }
+
+                    {
+                        lock_guard<mutex> lock(completionMutex);
+                        pendingOrders--;
+                    }
+
+                    completionCv.notify_all();
+                    continue;
+                }
+
+                auto newTrades =
+                    engine.matchingEngine.processOrder(order);
+
+                for(const auto& trade : newTrades){
+                    settleTrade(trade);
+                }
+
+                if(order.type == OrderType::MARKET){
                     lock_guard<mutex> lock(ordersMutex);
-                    Order& storedOrder = orders.at(order.orderId);
+
+                    Order& storedOrder =
+                        orders.at(order.orderId);
+
                     storedOrder.quantity = 0;
-                    storedOrder.status = OrderStatus::CANCELLED;
+
+                    if(!newTrades.empty()){
+                        storedOrder.status =
+                            OrderStatus::FILLED;
+                    }
+                    else{
+                        storedOrder.status =
+                            OrderStatus::CANCELLED;
+                    }
                 }
 
                 {
@@ -22,44 +67,20 @@ Exchange::Exchange(){
                 }
 
                 completionCv.notify_all();
-                continue;
             }
-
-            auto newTrades = symbolEngine.matchingEngine.processOrder(order);
-
-            for(const auto& trade : newTrades){
-                settleTrade(trade);
-            }
-
-            if(order.type == OrderType::MARKET){
-                lock_guard<mutex> lock(ordersMutex);
-
-                Order& storedOrder = orders.at(order.orderId);
-                storedOrder.quantity = 0;
-
-                if(!newTrades.empty()){
-                    storedOrder.status = OrderStatus::FILLED;
-                }
-                else{
-                    storedOrder.status = OrderStatus::CANCELLED;
-                }
-            }
-
-            {
-                lock_guard<mutex> lock(completionMutex);
-                pendingOrders--;
-            }
-
-            completionCv.notify_all();
-        }
-    });
+        });
+    }
 }
 
 Exchange::~Exchange(){
-    symbolEngine.orderQueue.stop();
+    for(auto& engine : symbolEngines){
+        engine.orderQueue.stop();
+    }
 
-    if(symbolEngine.matchingThread.joinable()){
-        symbolEngine.matchingThread.join();
+    for(auto& engine : symbolEngines){
+        if(engine.matchingThread.joinable()){
+            engine.matchingThread.join();
+        }
     }
 }
 
@@ -106,8 +127,10 @@ bool Exchange::validateMarketOrder(const Order& order){
     long long totalCost = 0;
     int remaining = order.quantity;
 
+    auto& engine = symbolEngines[toIndex(order.symbol)];
+
     const auto& sells =
-        symbolEngine.matchingEngine.orderBook.sells;
+        engine.matchingEngine.orderBook.sells;
 
     for(const auto& sell : sells){
         if(remaining == 0){
@@ -158,7 +181,8 @@ void Exchange::submitOrder(Order order){
         pendingOrders++;
     }
 
-    symbolEngine.orderQueue.push(order);
+    auto& engine = symbolEngines[toIndex(order.symbol)];
+    engine.orderQueue.push(order);
 }
 
 Trader& Exchange::getTrader(int traderId){
@@ -169,8 +193,8 @@ Order& Exchange::getOrder(int orderId){
     return orders.at(orderId);
 }
 
-MatchingEngine& Exchange::getMatchingEngine(Symbol){
-    return symbolEngine.matchingEngine;
+MatchingEngine& Exchange::getMatchingEngine(Symbol symbol){
+    return symbolEngines[toIndex(symbol)].matchingEngine;
 }
 
 void Exchange::settleTrade(const Trade& trade){

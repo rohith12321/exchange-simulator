@@ -12,7 +12,7 @@
 
 class Exchange{
     private:
-        SymbolEngine symbolEngine;
+        std::array<SymbolEngine, 5> symbolEngines;
 
         std::unordered_map<int, Trader> traders;
         std::unordered_map<int, Order> orders;

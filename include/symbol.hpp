@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 enum class Symbol
 {
     AAPL,
@@ -8,3 +10,8 @@ enum class Symbol
     NVDA,
     TSLA
 };
+
+constexpr std::size_t toIndex(Symbol symbol)
+{
+    return static_cast<std::size_t>(symbol);
+}
