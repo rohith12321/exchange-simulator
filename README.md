@@ -4,7 +4,36 @@ A concurrent electronic exchange simulator implemented in modern C++. The projec
 
 The primary objective of this project was to understand how electronic exchanges work while gaining practical experience with multithreading, synchronization, producer-consumer systems, and concurrent systems programming.
 
----
+```text
+                 Router
+                    │
+
+      --------------------------
+      │            │           │
+
+      ▼            ▼           ▼
+
+    AAPL         GOOG        MSFT
+
+ +---------+   +---------+  +---------+
+ | Order   |   | Order   |  | Order   |
+ | Queue   |   | Queue   |  | Queue   |
+ +---------+   +---------+  +---------+
+
+      │            │           │
+
+      ▼            ▼           ▼
+
+ +---------+   +---------+  +---------+
+ |Matching |   |Matching |  |Matching |
+ | Thread  |   | Thread  |  | Thread  |
+ +---------+   +---------+  +---------+
+
+      │            │           │
+
+      └────────────┼───────────┘
+                   │
+                   ▼
 
 # Features
 
