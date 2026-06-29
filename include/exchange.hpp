@@ -27,7 +27,7 @@ class Exchange{
         ~Exchange();
         std::unordered_map<int, Order> orders;
         void addTrader(int traderId, long long initialCash = 1000000);
-        void submitOrder(Order order);
+        bool submitOrder(Order order);
         void settleTrade(const Trade& trade);
 
         Trader& getTrader(int traderId);

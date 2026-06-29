@@ -1,8 +1,9 @@
 #include <chrono>
 #include <iomanip>
 #include <iostream>
-#include <atomic>
 #include <thread>
+#include <chrono>
+#include <random>
 
 #include "../include/exchange.hpp"
 
@@ -10,14 +11,17 @@ using namespace std;
 using Clock = chrono::steady_clock;
 
 constexpr int NUM_ORDERS = 1'000'000;
+constexpr int NUM_TRADERS = 100;
 constexpr long long INITIAL_CASH = 1'000'000'000'000'000LL;
 
 int main(){
 
     Exchange exchange;
     exchange.orders.reserve(NUM_ORDERS);
-    exchange.addTrader(1, INITIAL_CASH);
-    exchange.addTrader(2, INITIAL_CASH);
+
+    for(int i = 1; i <= NUM_TRADERS; i++){
+        exchange.addTrader(i, INITIAL_CASH);
+    }
 
     long long orderId = 1;
     long long timestamp = 1;
@@ -30,70 +34,60 @@ int main(){
          << NUM_ORDERS
          << " orders...\n";
 
+    mt19937 rng(42);
+
+    uniform_int_distribution<int> traderDist(1, NUM_TRADERS);
+    uniform_int_distribution<int> symbolDist(0, 4);
+    uniform_int_distribution<int> sideDist(0, 1);
+    uniform_int_distribution<int> quantityDist(1, 100);
+    uniform_int_distribution<int> priceDist(100, 1000);
+
     auto totalStart = Clock::now();
 
-    auto submitStart = Clock::now();
+    int accepted = 0;
+    int rejected = 0;
 
-    for(int i = 0; i < NUM_ORDERS / 2; i++){
+    for(int i = 0; i < NUM_ORDERS; i++){
+
+        int traderId = traderDist(rng);
 
         Symbol symbol =
-            static_cast<Symbol>(i % 5);
+            static_cast<Symbol>(symbolDist(rng));
 
-        exchange.submitOrder(
+        Side side =
+            sideDist(rng)
+                ? Side::BUY
+                : Side::SELL;
+
+        if(exchange.submitOrder(
             Order(
                 orderId++,
-                1,
+                traderId,
                 symbol,
-                Side::BUY,
+                side,
                 OrderType::LIMIT,
-                1,
-                500,
+                quantityDist(rng),
+                priceDist(rng),
                 timestamp++
             )
-        );
-
-        exchange.submitOrder(
-            Order(
-                orderId++,
-                2,
-                symbol,
-                Side::SELL,
-                OrderType::LIMIT,
-                1,
-                500,
-                timestamp++
-            )
-        );
+        )){
+            accepted++;
+        }
+        else{
+            rejected++;
+        }
     }
-
-    auto submitEnd = Clock::now();
 
     cout << "Finished submitting orders.\n";
 
-    auto processingStart = Clock::now();
-
     exchange.waitUntilIdle();
 
-    auto processingEnd = Clock::now();
+    auto totalEnd = Clock::now();
 
-    auto submitNs =
-        chrono::duration_cast<chrono::nanoseconds>(
-            submitEnd - submitStart
+    double totalSec =
+        chrono::duration<double>(
+            totalEnd - totalStart
         ).count();
-
-    auto processingNs =
-        chrono::duration_cast<chrono::nanoseconds>(
-            processingEnd - processingStart
-        ).count();
-
-    auto totalNs =
-        chrono::duration_cast<chrono::nanoseconds>(
-            processingEnd - totalStart
-        ).count();
-
-    double submitSec = submitNs / 1e9;
-    double processingSec = processingNs / 1e9;
-    double totalSec = totalNs / 1e9;
 
     long long totalTrades = 0;
 
@@ -116,65 +110,28 @@ int main(){
 
     cout << "\n============= Results =============\n\n";
 
-    cout << "Orders Submitted : "
+    cout << "Orders Generated : "
          << NUM_ORDERS
+         << '\n';
+
+    cout << "Orders Accepted  : "
+         << accepted
+         << '\n';
+
+    cout << "Orders Rejected  : "
+         << rejected
          << '\n';
 
     cout << "Trades Executed  : "
          << totalTrades
          << '\n';
 
-    cout << "\nTiming Breakdown\n";
-    cout << "----------------\n";
-
-    cout << "Submission\n";
-    cout << "  "
-         << submitNs
-         << " ns\n";
-    cout << "  "
-         << submitNs / 1000.0
-         << " us\n";
-    cout << "  "
-         << submitNs / 1000000.0
-         << " ms\n";
-    cout << "  "
-         << submitSec
-         << " s\n\n";
-
-    cout << "Processing (waitUntilIdle)\n";
-    cout << "  "
-         << processingNs
-         << " ns\n";
-    cout << "  "
-         << processingNs / 1000.0
-         << " us\n";
-    cout << "  "
-         << processingNs / 1000000.0
-         << " ms\n";
-    cout << "  "
-         << processingSec
-         << " s\n\n";
-
-    cout << "Total\n";
-    cout << "  "
-         << totalNs
-         << " ns\n";
-    cout << "  "
-         << totalNs / 1000.0
-         << " us\n";
-    cout << "  "
-         << totalNs / 1000000.0
-         << " ms\n";
-    cout << "  "
-         << totalSec
-         << " s\n";
-
     cout << "\nThroughput\n";
     cout << "----------\n";
 
     cout << "Orders / Second : "
          << static_cast<long long>(
-                NUM_ORDERS / totalSec
+                accepted / totalSec
             )
          << '\n';
 
@@ -184,55 +141,9 @@ int main(){
             )
          << '\n';
 
-    cout << "\nPer Symbol Trades\n";
-    cout << "-----------------\n";
-
-    cout << "AAPL : "
-         << exchange.getMatchingEngine(Symbol::AAPL).trades.size()
-         << '\n';
-
-    cout << "GOOG : "
-         << exchange.getMatchingEngine(Symbol::GOOG).trades.size()
-         << '\n';
-
-    cout << "MSFT : "
-         << exchange.getMatchingEngine(Symbol::MSFT).trades.size()
-         << '\n';
-
-    cout << "NVDA : "
-         << exchange.getMatchingEngine(Symbol::NVDA).trades.size()
-         << '\n';
-
-    cout << "TSLA : "
-         << exchange.getMatchingEngine(Symbol::TSLA).trades.size()
-         << '\n';
-
     cout << "\nHardware Threads : "
          << thread::hardware_concurrency()
          << '\n';
-
-    extern std::atomic<long long> validateTime;
-    extern std::atomic<long long> ordersLockTime;
-    extern std::atomic<long long> completionLockTime;
-    extern std::atomic<long long> queuePushTime;
-
-    cout << "\n========== submitOrder() breakdown ==========\n";
-
-    cout << "Validation          : "
-        << validateTime.load() / 1e6
-        << " ms\n";
-
-    cout << "Orders Mutex        : "
-        << ordersLockTime.load() / 1e6
-        << " ms\n";
-
-    cout << "Completion Mutex    : "
-        << completionLockTime.load() / 1e6
-        << " ms\n";
-
-    cout << "Queue Push          : "
-        << queuePushTime.load() / 1e6
-        << " ms\n";
 
     return 0;
 }

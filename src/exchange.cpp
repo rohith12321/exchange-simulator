@@ -1,14 +1,5 @@
 #include "../include/exchange.hpp"
 #include <stdexcept>
-#include <atomic>
-#include <chrono>
-
-using Clock = std::chrono::steady_clock;
-
-std::atomic<long long> validateTime{0};
-std::atomic<long long> ordersLockTime{0};
-std::atomic<long long> completionLockTime{0};
-std::atomic<long long> queuePushTime{0};
 
 using namespace std;
 
@@ -94,9 +85,10 @@ Exchange::~Exchange(){
 }
 
 void Exchange::addTrader(int traderId, long long initialCash){
-    traders.emplace(
+    traders.try_emplace(
         traderId,
-        Trader(traderId, initialCash)
+        traderId,
+        initialCash
     );
 }
 
@@ -166,55 +158,40 @@ bool Exchange::validateMarketOrder(const Order& order){
     return true;
 }
 
-void Exchange::submitOrder(Order order){
-
-    auto t0 = Clock::now();
+bool Exchange::submitOrder(Order order){
 
     if(traders.find(order.traderId) == traders.end()){
-        throw runtime_error("Unknown Trader");
+        return false;
     }
 
     if(!validateOrder(order)){
-        throw runtime_error("Risk check failed");
-    }
+        order.status = OrderStatus::CANCELLED;
 
-    auto t1 = Clock::now();
+        lock_guard<mutex> lock(ordersMutex);
+        orders.emplace(order.orderId, order);
+
+        return false;
+    }
 
     {
         lock_guard<mutex> lock(ordersMutex);
 
         if(orders.count(order.orderId)){
-            throw runtime_error("Duplicate Order ID");
+            return false;
         }
 
         orders.emplace(order.orderId, order);
     }
-
-    auto t2 = Clock::now();
 
     {
         lock_guard<mutex> lock(completionMutex);
         pendingOrders++;
     }
 
-    auto t3 = Clock::now();
-
     auto& engine = symbolEngines[toIndex(order.symbol)];
     engine.orderQueue.push(order);
 
-    auto t4 = Clock::now();
-
-    validateTime +=
-        chrono::duration_cast<chrono::nanoseconds>(t1 - t0).count();
-
-    ordersLockTime +=
-        chrono::duration_cast<chrono::nanoseconds>(t2 - t1).count();
-
-    completionLockTime +=
-        chrono::duration_cast<chrono::nanoseconds>(t3 - t2).count();
-
-    queuePushTime +=
-        chrono::duration_cast<chrono::nanoseconds>(t4 - t3).count();
+    return true;
 }
 
 Trader& Exchange::getTrader(int traderId){
