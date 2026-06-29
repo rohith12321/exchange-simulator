@@ -1,23 +1,21 @@
 #pragma once
 
+#include <array>
 #include <unordered_map>
 #include <thread>
 #include <mutex>
 #include <condition_variable>
 
-#include "threadsafequeue.hpp"
-#include "matchingengine.hpp"
+#include "symbolengine.hpp"
 #include "trader.hpp"
 #include "order.hpp"
 
 class Exchange{
     private:
-        MatchingEngine matchingEngine;
+        SymbolEngine symbolEngine;
+
         std::unordered_map<int, Trader> traders;
         std::unordered_map<int, Order> orders;
-
-        ThreadSafeQueue<Order> orderQueue;
-        std::thread matchingThread;
 
         std::mutex ordersMutex;
 
@@ -35,7 +33,7 @@ class Exchange{
 
         Trader& getTrader(int traderId);
         Order& getOrder(int orderId);
-        MatchingEngine& getMatchingEngine();
+        MatchingEngine& getMatchingEngine(Symbol symbol);
 
         bool cancelOrder(int orderId);
         bool validateOrder(const Order& order);

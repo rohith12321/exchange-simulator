@@ -14,19 +14,19 @@ int main(){
 
     for(int i = 0; i < N; i++){
         exchange.submitOrder(
-            Order(i + 1, 1, Side::BUY, OrderType::LIMIT, 1, 500, i + 1)
+            Order(i + 1, 1, Symbol::AAPL, Side::BUY, OrderType::LIMIT, 1, 500, i + 1)
         );
     }
 
     for(int i = 0; i < N; i++){
         exchange.submitOrder(
-            Order(N + i + 1, 2, Side::SELL, OrderType::LIMIT, 1, 500, N + i + 1)
+            Order(N + i + 1, 2, Symbol::AAPL, Side::SELL, OrderType::LIMIT, 1, 500, N + i + 1)
         );
     }
 
     exchange.waitUntilIdle();
 
-    auto& engine = exchange.getMatchingEngine();
+    auto& engine = exchange.getMatchingEngine(Symbol::AAPL);
 
     cout << "Trades: "
          << engine.trades.size()
